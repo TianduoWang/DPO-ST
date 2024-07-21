@@ -1,0 +1,46 @@
+exp_name: t5
+trainer:
+  run_name: sft-0
+  output_dir: ft_models/t5/sft-0
+  overwrite_output_dir: true
+  bf16: true
+  tf32: true
+  report_to: null
+  seed: 42
+  per_device_train_batch_size: 12
+  gradient_accumulation_steps: 1
+  num_train_epochs: 8
+  optim: 'adamw_torch'
+  weight_decay: 0.01
+  lr_scheduler_type: 'cosine_with_min_lr'
+  learning_rate: 3e-4
+  lr_scheduler_kwargs:
+    min_lr_rate: 0.1
+  warmup_ratio: 0.1
+  save_strategy: 'no'
+  ddp_find_unused_parameters: false
+  logging_steps: 10
+  dataloader_num_workers: 12
+
+model:
+  model_path: 'hf_models/flan-t5-large'
+
+data:
+  data_path: 'gsm8k/train.jsonl'
+  train_data_path: 'gsm8k/train.jsonl'
+  dev_data_path: 'gsm8k/dev.jsonl'
+  test_data_path: 'gsm8k/test.jsonl'
+  tokenizer_path: ${model.model_path}
+  model_max_length: 1024
+  max_src_len: 200
+  max_tgt_len: 300
+
+eval:
+  per_device_eval_batch_size: 96
+  max_new_tokens: 300
+  use_calc: true
+  mode: 'greedy'
+  sampling:
+    temperature: 0.7
+    min_seed: 0
+    max_seed: 10

@@ -1,0 +1,10 @@
+defaults:
+  - sft-0
+  - _self_
+
+trainer:
+  run_name: sft-2
+  output_dir: ft_models/t5/sft-2
+
+data:
+  data_path: model_outputs/t5/dpo-2/train/train_rft_processed.jsonl
