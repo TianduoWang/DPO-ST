@@ -4,10 +4,10 @@ This repository contains the official code and data for the paper **Self-Trainin
 
 
 ## Introduction
-Teaching small language models (e.g., T5-large and Llama-2-7b) do chain-of-thought reasoning by distilling from larger models like GPT-4 has become the one of the most effective methods. However, relying on such closed-source and propietry large models can be both computationally and economically costly. Our paper demonstrates that small language models are capable of learning from their own chain-of-thought in a self-training way, starting with limited amount of human-annnotated, high-quality training data. We also provide an effective and efficient way for integrating language models with external calculators during inference to improve the performance. 
+Teaching small language models (e.g., T5-large) chain-of-thought reasoning by distilling from larger models like GPT-4 is shown to be effective. However, relying on such propietry large models can be both economically and computationally costly. Our paper demonstrates that small language models are capable of learning from their own generations in a self-training manner, starting with a limited amount of high-quality, human-annotated training data. Additionally, we present an efficient method for integrating external calculators during inference to boost performance.
 <p align="center">
     <img src="images/intro.png" width="55%"> <br>
-    Our approach demonstrates superior performance while minimizing the required compute cost 
+    Our approach demonstrates superior performance while minimizing the required compute cost.
 </p>
 
 ## About DPO-ST
@@ -15,6 +15,16 @@ Teaching small language models (e.g., T5-large and Llama-2-7b) do chain-of-thoug
 <p align="center">
     <img src="images/flow_chart.png" width="85%"> <br>
 </p>
+
+
+## Model inference with external calculators
+Integrating external calculators during model inference can enhance math reasoning performance. However, many previous efforts support only a batch size of 1, significantly slowing down inference speed. In this work, we present an efficient method for integrating external calculators that supports larger inference batch sizes.
+Specifically, we design a [LogitsProcessor](https://huggingface.co/docs/transformers/internal/generation_utils#logitsprocessor) that modifies model's output during inference. More details about our implementation can be found at [generate.py](generate.py?plain=1#L109).
+<p align="center">
+    <img src="images/calc.png" width="75%"> <br>
+    Inference speed-up comparison with Flan-T5-Large on a single A40 GPU.
+</p>
+
 
 ## Setup
 Please follow the following steps before running our code.
@@ -70,13 +80,13 @@ python3 utils/make_dpo_data.py --config-name=sft-0
 Note that the above code is for T5 models. For Llama, add `--config-path=exp_config/llama` for each command.
 
 ## Step 2.2: Train SFT model with DPO objective
-For Flan-T5-Large, run the following command:
+For T5:
 ```bash
 ACC_CONFIG='acc_config/ddp8.yaml'
 accelerate launch --config_file $ACC_CONFIG dpo.py --config-name=dpo-1
 ```
 
-For Llama-2-7b, run the following command:
+For Llama:
 ```bash
 ACC_CONFIG='acc_config/fsdp.yaml'
 accelerate launch --config_file $ACC_CONFIG dpo.py --config-path=exp_config/llama --config-name=dpo-1
@@ -85,23 +95,33 @@ accelerate launch --config_file $ACC_CONFIG dpo.py --config-path=exp_config/llam
 ## Step 2.3: Sampling pseudo-labels from DPO model
 ```bash
 ARGS='+data.split="train" eval.mode="sampling" eval.sampling.max_seed=3'
-torchrun --nproc_per_node 8 --master_port $PORT_NUM greedy_decode.py --config-name=dpo-1 $ARGS
+torchrun --nproc_per_node 8 greedy_decode.py --config-name=dpo-1 $ARGS
 python3 eval_sampling.py --config-name=dpo-1 $ARGS
 python3 utils/make_rft_data.py --config-name=dpo-1
 ```
 You can control the number of sampled generations per question by adjusting `eval.sampling.max_seed`.
 
-## Step 2.4: Re-finetune the pre-trained model with labeled and pseudo-labeled data
-For T5,
+## Step 2.4: SFT with labeled and pseudo-labeled data
+For T5:
 ```bash
 ACC_CONFIG='acc_config/ddp8.yaml'
 accelerate launch --config_file $ACC_CONFIG sft.py --config-name=sft-1
 ```
-For Llama,
+For Llama:
 ```bash
 ACC_CONFIG='acc_config/fsdp.yaml'
 accelerate launch --config_file $ACC_CONFIG sft.py --config-path=exp_config/llama --config-name=sft-1
 ```
+
+## Evaluation
+```bash
+CONFIG_PATH='exp_config/t5'
+SPLIT='test'
+torchrun --nproc_per_node 8 generate.py --config-path=$CONFIG_PATH --config-name=dpo-1 +data.split=$SPLIT
+python3 eval_greedy.py --config-path=$CONFIG_PATH --config-name=dpo-1 +data.split=$SPLIT
+```
+- `CONFIG_PATH`: set it to `exp_config/t5` for t5 models and `exp_config/llama` for llama models
+- `SPLIT`: set it to `dev` for dev set results and `test` for test set results
 
 
 ## Citation
