@@ -6,8 +6,8 @@ This repository contains the official code and data for the paper **Self-Trainin
 ## Introduction
 Teaching small language models (e.g., T5-large and Llama-2-7b) do chain-of-thought reasoning by distilling from larger models like GPT-4 has become the one of the most effective methods. However, relying on such closed-source and propietry large models can be both computationally and economically costly. Our paper demonstrates that small language models are capable of learning from their own chain-of-thought in a self-training way, starting with limited amount of human-annnotated, high-quality training data. We also provide an effective and efficient way for integrating language models with external calculators during inference to improve the performance. 
 <p align="center">
-    <img src="images/intro.png" width="65%"> <br>
-    Our approach demonstrates superior performance on the GSM8K benchmark while minimizing the required compute cost 
+    <img src="images/intro.png" width="55%"> <br>
+    Our approach demonstrates superior performance while minimizing the required compute cost 
 </p>
 
 ## About DPO-ST
@@ -27,14 +27,82 @@ conda activate dpo-st
 ```
 pip install requirements.txt
 ```
-3. Define DATA_DIR in the .env and put pre-trained model checkpoints under it
+3. Loggin to huggingface for downlaoding pre-trained model weights
 ```
-DATA_DIR=${your_directory_for_keeping_pre-trained_models}
+huggingface-cli login --token "${your_hf_token}"
 ```
-4. (Optional) provide your Wandb key
+4. Set the environment variable DATA_DIR and download pre-trained model weights from huggingface into `DATA_DIR/hf_models`. For example,
 ```
-WANDB_API_KEY=${your_wandb_key}
+DATA_DIR='.'
+huggingface-cli download meta-llama/Llama-2-7b-hf --local-dir DATA_DIR/hf_models/llama-2
 ```
+We recommend using [python-dotenv](https://pypi.org/project/python-dotenv/)
+to define the `DATA_DIR` in to your `.env` file
+as this environment variable will be used in the subsequent steps.
+
+
+## Step 1: Warm-up
+The first step of DPO-ST is to warm-up the pre-trained language model by fine-tuning it on the labeled dataset.
+
+For Flan-T5-Large, run the following command:
+```bash
+ACC_CONFIG='acc_config/ddp8.yaml'
+accelerate launch --config_file $ACC_CONFIG sft.py --config-name=sft-0
+```
+
+For Llama-2-7b, run the following command:
+```bash
+ACC_CONFIG='acc_config/fsdp.yaml'
+accelerate launch --config_file $ACC_CONFIG sft.py --config-path=exp_config/llama --config-name=sft-0
+```
+
+## Step 2.1: Prepare DPO training data
+First, to sample pseudo-labels from the SFT model:
+```bash
+ARGS='+data.split="train" eval.mode="sampling" eval.sampling.max_seed=5'
+torchrun --nproc_per_node 8 generate.py --config-name=sft-0 $ARGS
+python3 eval_sampling.py --config-name=sft-0 $ARGS
+```
+Then, make DPO training data from the SFT model generations:
+```bash
+python3 utils/make_dpo_data.py --config-name=sft-0
+```
+Note that the above code is for T5 models. For Llama, add `--config-path=exp_config/llama` for each command.
+
+## Step 2.2: Train SFT model with DPO objective
+For Flan-T5-Large, run the following command:
+```bash
+ACC_CONFIG='acc_config/ddp8.yaml'
+accelerate launch --config_file $ACC_CONFIG dpo.py --config-name=dpo-1
+```
+
+For Llama-2-7b, run the following command:
+```bash
+ACC_CONFIG='acc_config/fsdp.yaml'
+accelerate launch --config_file $ACC_CONFIG dpo.py --config-path=exp_config/llama --config-name=dpo-1
+```
+
+## Step 2.3: Sampling pseudo-labels from DPO model
+```bash
+ARGS='+data.split="train" eval.mode="sampling" eval.sampling.max_seed=3'
+torchrun --nproc_per_node 8 --master_port $PORT_NUM greedy_decode.py --config-name=dpo-1 $ARGS
+python3 eval_sampling.py --config-name=dpo-1 $ARGS
+python3 utils/make_rft_data.py --config-name=dpo-1
+```
+You can control the number of sampled generations per question by adjusting `eval.sampling.max_seed`.
+
+## Step 2.4: Re-finetune the pre-trained model with labeled and pseudo-labeled data
+For T5,
+```bash
+ACC_CONFIG='acc_config/ddp8.yaml'
+accelerate launch --config_file $ACC_CONFIG sft.py --config-name=sft-1
+```
+For Llama,
+```bash
+ACC_CONFIG='acc_config/fsdp.yaml'
+accelerate launch --config_file $ACC_CONFIG sft.py --config-path=exp_config/llama --config-name=sft-1
+```
+
 
 ## Citation
 If you find this paper useful, please consider citing it

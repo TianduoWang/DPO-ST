@@ -1,0 +1,13 @@
+defaults:
+  - dpo-1
+  - _self_
+trainer:
+  run_name: 'dpo-3'
+  output_dir: 'ft_models/llama-2/dpo-3'
+
+model:
+  sft_run_name: sft-2
+  model_path: ft_models/llama-2/sft-2
+
+data:
+  data_dir: model_outputs/${exp_name}/${model.sft_run_name}/train/
