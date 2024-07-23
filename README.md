@@ -21,7 +21,7 @@ Teaching small language models (e.g., T5-large) chain-of-thought reasoning by di
 Integrating external calculators during model inference can enhance math reasoning performance. However, many previous efforts support only a batch size of 1, significantly slowing down inference speed. In this work, we present an efficient method for integrating external calculators that supports larger inference batch sizes.
 Specifically, we design a [LogitsProcessor](https://huggingface.co/docs/transformers/internal/generation_utils#logitsprocessor) that modifies model's output during inference. More details about our implementation can be found at [generate.py](generate.py?plain=1#L109).
 <p align="center">
-    <img src="images/calc.png" width="75%"> <br>
+    <img src="images/calc.png" width="55%"> <br>
     Inference speed-up comparison with Flan-T5-Large on a single A40 GPU.
 </p>
 
