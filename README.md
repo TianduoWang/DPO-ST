@@ -1,6 +1,6 @@
 # DPO-ST: DPO-augmented Self-Training
 
-This repository contains the official code and data for the paper **Self-Training with Direct Preference Optimization Improves Chain-of-Thought Reasoning**
+This repository contains the official code and data for our ACL 2024 paper [Self-Training with Direct Preference Optimization Improves Chain-of-Thought Reasoning](https://arxiv.org/abs/2407.18248).
 
 
 ## Introduction
