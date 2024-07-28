@@ -37,7 +37,7 @@ conda activate dpo-st
 ```
 pip install requirements.txt
 ```
-3. Loggin to huggingface for downlaoding pre-trained model weights
+3. Loggin to huggingface for downloading pre-trained model weights
 ```
 huggingface-cli login --token "${your_hf_token}"
 ```
